@@ -76,9 +76,10 @@ def insert_product_data(conn: connection, data_product: dict):
 
     else:
 
-        query = "INSERT INTO products (product_name, product_url, website_name) VALUES (%s, %s, %s)"
+        query = "INSERT INTO products (product_name, product_url, product_availability, website_name) VALUES (%s, %s, %s, %s)"
         cur.execute(query, (data_product.get('product_name', 'Unknown'),
                             data_product['product_url'],
+                            data_product['is_in_stock'],
                             data_product['website_name']))
         conn.commit()
         cur.close()
