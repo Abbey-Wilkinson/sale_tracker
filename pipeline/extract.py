@@ -92,7 +92,6 @@ if __name__ == "__main__":
     load_dotenv()
 
     headers = {
-        'authority':  environ["AUTHORITY"],
         'user-agent': environ["USER_AGENT"]
     }
 
