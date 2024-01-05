@@ -62,10 +62,24 @@ def scrape_asos_page(url: str, header: dict) -> dict:
         price = requests.get(price_endpoint, timeout=5).json()[
             0]["productPrice"]["current"]["value"]
 
+        sizes = requests.get(price_endpoint, timeout=5).json()[0]['variants']
+
         if price:
             wanted_prod_data["price"] = price
         else:
             wanted_prod_data["price"] = "Price not found"
+
+        availabilities = []
+        for size in sizes:
+            if size["isInStock"] == True:
+                availabilities.append(size["isInStock"])
+            else:
+                availabilities.append(size["isInStock"])
+
+        if True in availabilities:
+            wanted_prod_data["is_in_stock"] = True
+        else:
+            wanted_prod_data["is_in_stock"] = False
 
         return wanted_prod_data
 
