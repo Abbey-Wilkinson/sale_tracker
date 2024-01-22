@@ -4,21 +4,34 @@ API.
 from os import environ, _Environ
 from datetime import datetime
 
+
 from boto3 import client
 from mypy_boto3_ses import SESClient
 from dotenv import load_dotenv
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect, url_for, session
+from flask_session import Session
+from tempfile import mkdtemp
 from psycopg2 import connect, extras
 from psycopg2.extensions import connection
+from psycopg2.extras import RealDictCursor
 
 from extract import scrape_asos_page
 
+load_dotenv()
+
 app = Flask(__name__, template_folder='./templates')
+
+app.secret_key = environ.get('FLASK_SECRET_KEY', 'a_default_secret_key')
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_FILE_DIR'] = mkdtemp()
+app.config['SESSION_PERMANENT'] = True
+app.config['PERMANENT_SESSION_LIFETIME'] = 6000
+Session(app)
 
 
 EMAIL_SELECTION_QUERY = "SELECT email FROM users;"
 PRODUCT_URL_SELECTION_QUERY = "SELECT product_name FROM products;"
-INSERT_USER_DATA_QUERY = "INSERT INTO users(email, first_name, last_name) VALUES (%s, %s, %s)"
+INSERT_USER_DATA_QUERY = "INSERT INTO users(email, first_name, last_name, password) VALUES (%s, %s, %s, %s)"
 INSERT_INTO_PRODUCTS_QUERY = """
                 INSERT INTO products (product_name, product_url, image_url, product_availability, website_name) 
                 VALUES (%s, %s, %s, %s, %s)
@@ -27,7 +40,8 @@ PRODUCT_ID_QUERY = "SELECT product_id FROM products WHERE product_url = (%s)"
 INSERT_INTO_PRICES_QUERY = "INSERT INTO prices (updated_at, product_id, price) VALUES (%s, %s, %s)"
 SELECT_SUB_BY_PRODUCT_AND_USER_QUERY = "SELECT * FROM subscriptions WHERE user_id = (%s) AND product_id = (%s);"
 INSERT_INTO_SUBSCRIPTIONS_QUERY = "INSERT INTO subscriptions (user_id, product_id) VALUES (%s, %s);"
-SELECT_USERS_BY_EMAIL_QUERY = "SELECT user_id FROM users WHERE email = (%s);"
+SELECT_USERS_BY_EMAIL_QUERY = "SELECT user_id, password, email, first_name, last_name FROM users WHERE email = (%s);"
+SELECT_USERS_BY_ID_QUERY = "SELECT user_id, password, email, first_name, last_name FROM users WHERE user_id = (%s);"
 GET_PRODUCTS_FROM_EMAIL_QUERY = """
                 SELECT DISTINCT ON (prices.product_id) users.first_name, products.product_name,products.product_url, products.product_id, products.image_url, products.product_availability, prices.price
                 FROM users
@@ -37,11 +51,11 @@ GET_PRODUCTS_FROM_EMAIL_QUERY = """
                 WHERE users.email = (%s)
                 ORDER BY prices.product_id, prices.updated_at DESC;  
                 """
-GET_SUBS_BY_EMAIL_QUERY = """
-                SELECT subscriptions.user_id
+GET_SUBS_BY_ID_QUERY = """
+                SELECT subscriptions.user_id, users.email, users.first_name, users.last_name
                 FROM subscriptions
                 JOIN users ON subscriptions.user_id = users.user_id
-                WHERE users.email = (%s);
+                WHERE users.user_id = (%s);
                 """
 GET_PROD_ID_BY_PROD_NAME_QUERY = "SELECT product_id FROM products WHERE product_name = %s;"
 DELETE_SUBSCRIPTIONS_QUERY = "DELETE FROM subscriptions WHERE product_id = (%s) AND user_id = (%s);"
@@ -81,7 +95,8 @@ def insert_user_data(conn: connection, data_user: dict):
     else:
         cur.execute(INSERT_USER_DATA_QUERY, (data_user["email"],
                                              data_user["first_name"],
-                                             data_user["last_name"]))
+                                             data_user["last_name"],
+                                             data_user["password"]))
 
         conn.commit()
         cur.close()
@@ -131,15 +146,15 @@ def insert_product_data_and_price_data(conn: connection, data_product: dict):
         cur.close()
 
 
-def insert_subscription_data(conn: connection, user_email: str, product_url: str) -> None:
+def insert_subscription_data(conn: connection, user_id: str, product_url: str) -> None:
     """
     Inserts subscription data into the subscription table.
     """
 
     cur = conn.cursor(cursor_factory=extras.RealDictCursor)
 
-    user_query = SELECT_USERS_BY_EMAIL_QUERY
-    cur.execute(user_query, (user_email,))
+    user_query = SELECT_USERS_BY_ID_QUERY
+    cur.execute(user_query, (user_id,))
     user_id = cur.fetchone().get('user_id')
 
     cur.execute(PRODUCT_ID_QUERY, (product_url,))
@@ -179,7 +194,103 @@ def index():
     """
     Displays the HTML homepage.
     """
-    return render_template('/index.html')
+
+    return render_template('/login_page.html')
+
+
+@app.route("/logged_in")
+def logged_in_index():
+
+    return render_template("/index.html")
+
+
+@app.route("/login", methods=["POST", "GET"])
+def login():
+    """
+    Logs a user into their Sale Tracker account.
+    """
+
+    error_message = None
+    connection = get_database_connection()
+
+    if request.method == "GET":
+        return render_template("/login/login_page.html")
+
+    if request.method == "POST":
+
+        email = request.form.get('email')
+        password = request.form.get('password')
+
+        with connection.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(SELECT_USERS_BY_EMAIL_QUERY, (email,))
+            user = cur.fetchone()
+
+            if user and user["password"] == password:
+                session['user_id'] = user['user_id']
+
+                return redirect(url_for(("logged_in_index")))
+            if not user:
+                error_message = "Invalid email. No account with that email address."
+                return render_template("/login/login_page.html", error=error_message)
+            else:
+                error_message = "Invalid password. Please try again."
+                return render_template("/login/login_page.html", error=error_message)
+
+    return render_template("/login/login_page.html")
+
+
+@app.route("/create_account", methods=["POST", "GET"])
+def create_account():
+    """
+    Creates a user account for Sale Tracker.
+    """
+    error_message = None
+    connection = get_database_connection()
+
+    if request.method == "GET":
+        return render_template("/login/create_account.html")
+
+    if request.method == "POST":
+        password = request.form.get('password')
+        re_enter_password = request.form.get('re-enter-password')
+        first_name = request.form.get('firstName').capitalize()
+        last_name = request.form.get('lastName').capitalize()
+        email = request.form.get("email")
+
+        with connection.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(SELECT_USERS_BY_EMAIL_QUERY, (email,))
+            user = cur.fetchone()
+
+            if user:
+                error_message = "User with that email already exists."
+
+                return render_template("/login/create_account.html", error=error_message)
+
+        if password != re_enter_password:
+            error_message = "Passwords do not match. Please try again."
+            return render_template("/login/create_account.html", error=error_message)
+
+        user_data = {
+            'first_name': first_name,
+            'last_name': last_name,
+            'email': email,
+            'password': password
+        }
+
+        insert_user_data(connection, user_data)
+
+        return render_template("/login/created.html")
+
+    return render_template("/login/create_account.html")
+
+
+@app.route('/logout')
+def logout():
+    """
+    Logs out the user.
+    """
+    session.pop('user_id', None)
+    return redirect(url_for('index'))
 
 
 @app.route('/addproducts', methods=["POST", "GET"])
@@ -189,9 +300,10 @@ def submit():
     """
     connection = get_database_connection()
     if request.method == 'POST':
-        first_name = request.form.get('firstName').capitalize()
-        last_name = request.form.get('lastName').capitalize()
-        email = request.form.get('email')
+
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
+
         url = request.form.get('url')
 
         header = {
@@ -200,19 +312,14 @@ def submit():
 
         product_data = scrape_asos_page(url, header)
 
-        user_data = {
-            'first_name': first_name,
-            'last_name': last_name,
-            'email': email
-        }
-
-        insert_user_data(connection, user_data)
         insert_product_data_and_price_data(connection, product_data)
-        insert_subscription_data(connection, email, url)
+        insert_subscription_data(connection, session["user_id"], url)
 
         return render_template('/submitted_form/submitted_form.html')
 
     if request.method == "GET":
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
         return render_template('/submission_form/input_website.html')
 
 
@@ -222,28 +329,22 @@ def unsubscribe_index():
     Displays the unsubscribe HTML page.
     """
     conn = get_database_connection()
-    if request.method == "POST":
-        email = request.form.get('email')
+    if request.method == "GET":
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
 
         cur = conn.cursor(cursor_factory=extras.RealDictCursor)
 
-        cur.execute(EMAIL_SELECTION_QUERY)
-        rows = cur.fetchall()
-
-        emails = [row["email"] for row in rows]
-
-        if email not in emails:
-            return render_template('/subscriptions/not_subscribed.html')
-
-        cur.execute(GET_SUBS_BY_EMAIL_QUERY, (email,))
+        cur.execute(GET_SUBS_BY_ID_QUERY, (session["user_id"],))
 
         result = cur.fetchall()
 
         if not result:
             return render_template('/subscriptions/not_subscribed.html')
 
+        email = result[0]["email"]
+
         user_products = get_products_from_email(conn, email)
-        print(user_products)
 
         for user in user_products:
             if user["product_availability"] == True:
@@ -256,13 +357,14 @@ def unsubscribe_index():
 
         num_of_products = len(user_products)
 
-        return render_template('subscriptions/product_list.html',
-                               names=user_products,
-                               firstname=user_first_name,
-                               user_email=email,
-                               num_products=num_of_products)
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
 
-    return render_template('/subscriptions/subscriptions_index.html')
+    return render_template('subscriptions/product_list.html',
+                           names=user_products,
+                           firstname=user_first_name,
+                           user_email=email,
+                           num_products=num_of_products)
 
 
 @app.route('/delete_subscription', methods=["POST"])
@@ -285,7 +387,7 @@ def delete_subscription():
                 (product_id, user_id))
     conn.commit()
 
-    return 'Subscription deleted successfully', 200
+    return redirect(url_for('unsubscribe_index'))
 
 
 @app.route("/submitted", methods=["POST"])
@@ -298,5 +400,4 @@ def submitted_form():
 
 
 if __name__ == "__main__":
-    load_dotenv()
     app.run(debug=True, host="0.0.0.0")

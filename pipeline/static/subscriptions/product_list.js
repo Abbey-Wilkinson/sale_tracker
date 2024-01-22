@@ -12,6 +12,7 @@ function getUserEmail() {
                 xhr_request.onreadystatechange = function() {
                     if (this.readyState == XMLHttpRequest.DONE && this.status == 200) {
                         element.parentNode.parentNode.remove();
+                        window.location.reload()
                     }
                 }
                 xhr_request.send("product_name=" + encodeURIComponent(productName) + "&user_email=" + encodeURIComponent(userEmail));

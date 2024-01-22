@@ -11,24 +11,13 @@
 </script>
 </head>
 <body>
-    <h1>Product Tracker</h1>
-    <p>Enter your name, email, and the complete URL of the product you would like to track.</p>
+    <h1>ASOS Product Tracker</h1>
+    <p>Please enter the complete URL of the ASOS product you would like to track.</p>
     <div class="container" id="submit">
-        <h2>Please input your information</h2>
+        <h2>Please enter an ASOS product URL</h2>
         <form action="/addproducts" method="post">
-            <label for="firstName">First Name:</label>
-            <input type="text" id="firstName" name="firstName" required>
-            <span id="first-name-error-message" style="color: red; display: none;">Please enter your first name.</span>
 
-            <label for="lastName">Last Name:</label>
-            <input type="text" id="lastName" name="lastName" required>
-            <span id="last-name-error-message" style="color: red; display: none;">Please enter your last name.</span>
-
-            <label for="email">Email:</label>
-            <input type="email" id="email" name="email" required>
-            <span id="email-error-message" style="color: red; display: none;">Please enter a valid email.</span>
-
-            <label for="url"> ASOS Product URL:</label>
+            <label for="url">ASOS Product URL:</label>
             <input type="url" id="url" name="url" required>
             <span id="error-message" style="color: red; display: none;">Please enter a valid ASOS Product URL.</span>
 
@@ -36,8 +25,9 @@
         </form>
     </div>
     <div class="buttons-container">
-        <button id="return_to_index_button" onclick='window.location.href = "./"'>Homepage</button>
+        <button id="return_to_index_button" onclick='window.location.href = "./logged_in"'>Homepage</button>
         <button id="unsubscribe" onclick='window.location.href = "./subscriptions"'>View Subscriptions</button>
+        <button id="unsubscribe" onclick='window.location.href = "./logout"'>Logout</button>
     </div>
     <br>
 </body>

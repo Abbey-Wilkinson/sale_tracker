@@ -23,7 +23,8 @@ CREATE TABLE  users (
     user_id SERIAL PRIMARY KEY,
     email TEXT NOT NULL,
     first_name VARCHAR(255) NOT NULL,
-    last_name VARCHAR(255) NOT NULL
+    last_name VARCHAR(255) NOT NULL,
+    password TEXT NOT NULL
 );
 
 CREATE TABLE  subscriptions (

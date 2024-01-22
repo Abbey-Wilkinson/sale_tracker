@@ -79,8 +79,8 @@
             color: #007bff;
             cursor: pointer;
             outline: none;
-            margin: 0 0.5rem; /* Space between buttons when inline */
-            min-width: 200px; /* Minimum width for the buttons */
+            margin: 0 0.5rem;
+            min-width: 200px;
             max-width: 200px;
         }
 

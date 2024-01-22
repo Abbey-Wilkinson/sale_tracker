@@ -48,7 +48,9 @@ def get_database_connection() -> connection:
 
 
 def load_all_database_info(db_conn: connection) -> DataFrame:
-    """Extract all data from the database."""
+    """
+    Extract all data from the database.
+    """
 
     with db_conn.cursor(cursor_factory=RealDictCursor) as cur:
 
@@ -59,7 +61,7 @@ def load_all_database_info(db_conn: connection) -> DataFrame:
         return pd.DataFrame(result).rename(columns=COLUMNS)
 
 
-def hash_password(password):
+def hash_password(password: str):
     """
     Hashes the passwords given.
     """
