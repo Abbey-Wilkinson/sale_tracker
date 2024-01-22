@@ -7,3 +7,4 @@ psycopg2-binary
 flask
 boto3
 pytest-cov
+selenium
