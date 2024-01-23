@@ -203,6 +203,9 @@ def index():
 
 @app.route("/logged_in")
 def logged_in_index():
+    """
+    Loads the login index.
+    """
 
     return render_template("/index.html")
 
