@@ -329,7 +329,7 @@ def submit():
 
 
 @app.route('/subscriptions', methods=["GET", "POST"])
-def unsubscribe_index():
+def subscriptions():
     """
     Displays the unsubscribe HTML page.
     """
@@ -400,7 +400,6 @@ def submitted_form():
     """
     Displays the submitted form HTML page.
     """
-
     return render_template('/submitted_form/submitted_form.html')
 
 
