@@ -6,6 +6,7 @@ from datetime import datetime
 
 
 from boto3 import client
+from cryptography.fernet import Fernet
 from mypy_boto3_ses import SESClient
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, session
@@ -20,6 +21,8 @@ from extract import scrape_asos_page
 load_dotenv()
 
 app = Flask(__name__, template_folder='./templates')
+
+fernet = Fernet(environ["FERNET_KEY"].encode())
 
 app.secret_key = environ.get('FLASK_SECRET_KEY', 'a_default_secret_key')
 app.config['SESSION_TYPE'] = 'filesystem'
@@ -225,7 +228,7 @@ def login():
             cur.execute(SELECT_USERS_BY_EMAIL_QUERY, (email,))
             user = cur.fetchone()
 
-            if user and user["password"] == password:
+            if user and fernet.decrypt(user["password"].encode()).decode() == password:
                 session['user_id'] = user['user_id']
 
                 return redirect(url_for(("logged_in_index")))
@@ -270,11 +273,13 @@ def create_account():
             error_message = "Passwords do not match. Please try again."
             return render_template("/login/create_account.html", error=error_message)
 
+        encrypted_password = fernet.encrypt(password.encode()).decode()
+
         user_data = {
             'first_name': first_name,
             'last_name': last_name,
             'email': email,
-            'password': password
+            'password': encrypted_password
         }
 
         insert_user_data(connection, user_data)
