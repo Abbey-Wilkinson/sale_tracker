@@ -3,8 +3,9 @@ Streamlit app that runs the Dashboard.
 """
 import logging
 from PIL import Image
+from os import environ
 
-import bcrypt
+from cryptography.fernet import Fernet
 from dotenv import load_dotenv
 import extra_streamlit_components as stx
 from extra_streamlit_components.CookieManager import CookieManager
@@ -15,14 +16,19 @@ from cookies import set_cookies, clear_cookies_of_session
 from database import get_database_connection, load_all_database_info, get_user_info
 from rendering import render_dashboard, render_login_page
 
+load_dotenv()
 
 WEBSITE_URL = "http://3.10.142.198:5000/"
 LOGO_URL = "./static/favicon.ico"
+
+fernet = Fernet(environ["FERNET_KEY"].encode())
+
 
 im = Image.open(LOGO_URL)
 st.set_page_config(
     page_icon=im,
     layout="wide")
+
 
 def authenticate_user(users: list[dict], email: str, password: str) -> dict | None:
     """
@@ -30,7 +36,7 @@ def authenticate_user(users: list[dict], email: str, password: str) -> dict | No
     from the RDS if the details entered match, otherwise returns None.
     """
     for user in users:
-        if email == user["email"] and bcrypt.checkpw(password.encode('utf-8'), user["password"]):
+        if email == user["email"] and password == fernet.decrypt(user["password"].encode()).decode():
             return user
     return None
 
@@ -103,5 +109,4 @@ def main_display():
 
 
 if __name__ == "__main__":
-    load_dotenv()
     main_display()

@@ -9,7 +9,8 @@ CREATE TABLE products (
     product_url TEXT NOT NULL,
     website_name VARCHAR(255) NOT NULL,
     product_availability BOOLEAN,
-    image_url TEXT
+    image_url TEXT,
+    size TEXT
 );
 
 CREATE TABLE prices (
@@ -23,7 +24,8 @@ CREATE TABLE  users (
     user_id SERIAL PRIMARY KEY,
     email TEXT NOT NULL,
     first_name VARCHAR(255) NOT NULL,
-    last_name VARCHAR(255) NOT NULL
+    last_name VARCHAR(255) NOT NULL,
+    password TEXT NOT NULL
 );
 
 CREATE TABLE  subscriptions (

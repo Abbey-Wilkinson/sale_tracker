@@ -5,7 +5,7 @@ box-sizing: border-box;
 transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-body, button, input[type="text"], input[type="email"], input[type="url"] {
+body, button, input[type="text"], input[type="email"], input[type="password"] {
 font-family: 'Source Sans Pro', sans-serif;
 }
 
@@ -62,7 +62,7 @@ gap: 10px;
 width: 100%;
 }
 
-input[type="text"], input[type="email"], input[type="url"], input[type="password"], button {
+input[type="text"], input[type="email"], input[type="password"], button {
 padding: 10px;
 border: 1px solid #ddd;
 border-radius: 4px;
@@ -70,7 +70,7 @@ width: 90%;
 box-sizing: border-box;
 }
 
-input[type="text"], input[type="email"], input[type="url"], input[type="password"] {
+input[type="text"], input[type="email"], input[type="password"] {
 background-color: #ffffff;
 }
 
@@ -79,14 +79,6 @@ display: flex;
 justify-content: center;
 gap: 1rem;
 margin-top: 3rem;
-}
-
-.size-selector {
-padding: 10px;
-border: 1px solid #ddd;
-border-radius: 4px;
-width: 90%;
-box-sizing: border-box;
 }
 
 button {
@@ -120,7 +112,7 @@ border-color: #007bff;
     gap: 1rem;
 }
 
-button, input[type="text"], input[type="email"], input[type="url"] {
+button, input[type="text"], input[type="email"], input[type="password"] {
     width: 100%;
 }
 }

@@ -3,7 +3,7 @@ Establishes a connection to the database.
 """
 from os import environ
 
-import bcrypt
+from cryptography.fernet import Fernet
 from dotenv import load_dotenv
 import pandas as pd
 from pandas import DataFrame
@@ -15,7 +15,7 @@ SELECT_ALL_QUERY = """SELECT prices.price_id, prices.updated_at,
                 prices.price, products.product_id, products.product_name,
                 products.product_url, products.website_name, products.image_url,
                 products.product_availability, users.user_id, users.email,
-                users.first_name, users.last_name, subscriptions.subscription_id
+                users.first_name, users.last_name, users.password, subscriptions.subscription_id
                 FROM prices
                 JOIN products ON products.product_id = prices.product_id
                 JOIN subscriptions ON subscriptions.product_id = products.product_id
@@ -29,6 +29,10 @@ COLUMNS = {"price_id": "Price ID", "updated_at": "Updated At",
            "website_name": "Website Name", "user_id": "User ID",
            "first_name": "User FirstName", "last_name": "User LastName",
            "email": "User Email", "subscription_id": "Subscription ID"}
+
+load_dotenv()
+
+fernet = Fernet(environ["FERNET_KEY"].encode())
 
 
 def get_database_connection() -> connection:
@@ -48,7 +52,9 @@ def get_database_connection() -> connection:
 
 
 def load_all_database_info(db_conn: connection) -> DataFrame:
-    """Extract all data from the database."""
+    """
+    Extract all data from the database.
+    """
 
     with db_conn.cursor(cursor_factory=RealDictCursor) as cur:
 
@@ -57,13 +63,6 @@ def load_all_database_info(db_conn: connection) -> DataFrame:
         result = cur.fetchall()
 
         return pd.DataFrame(result).rename(columns=COLUMNS)
-
-
-def hash_password(password):
-    """
-    Hashes the passwords given.
-    """
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
 
 
 def get_user_info(conn: connection) -> list[dict]:
@@ -78,7 +77,8 @@ def get_user_info(conn: connection) -> list[dict]:
              "type": "admin",
              "first_name": "Admin",
              "last_name": "Admin"}
-    admin["password"] = hash_password("adminPassword")
+    password = "adminPassword"
+    admin["password"] = fernet.encrypt(password.encode()).decode()
 
     all_users = []
     all_users.append(admin)
@@ -88,8 +88,6 @@ def get_user_info(conn: connection) -> list[dict]:
     users = cur.fetchall()
 
     for user in users:
-
-        user["password"] = hash_password('userPassword')
         user["type"] = 'user'
         all_users.append(user)
 
@@ -98,8 +96,4 @@ def get_user_info(conn: connection) -> list[dict]:
 
 if __name__ == "__main__":
 
-    load_dotenv()
-
     conn = get_database_connection()
-
-    print(load_all_database_info(conn))

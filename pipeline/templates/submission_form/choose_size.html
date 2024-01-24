@@ -12,15 +12,17 @@
 </head>
 <body>
     <h1>ASOS Product Tracker</h1>
-    <p>Please enter the complete URL of the ASOS product you would like to track.</p>
     <div class="container" id="submit">
-        <h2>Please enter an ASOS product URL</h2>
-        <form action="/addproducts" method="post">
-
-            <label for="url">ASOS Product URL:</label>
-            <input type="url" id="url" name="url" required>
-            <span id="error-message" style="color: red; display: none;">Please enter a valid ASOS Product URL.</span>
-
+        <h2>Please enter the size you would like to track</h2>
+        <form action="/size" method="post">
+            <br></br>
+            <select class="size-selector" id="variantSelector" name="size">
+            <option data-test-id="Select">Please select a size</option>
+            {% for size in sizes %}
+            <option data-test-id="{{ size }}">{{ size }}</option>
+            {% endfor %}
+        </select>
+        <br></br>
             <button type="submit">Submit</button>
         </form>
     </div>
