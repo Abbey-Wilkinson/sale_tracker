@@ -9,7 +9,8 @@ CREATE TABLE products (
     product_url TEXT NOT NULL,
     website_name VARCHAR(255) NOT NULL,
     product_availability BOOLEAN,
-    image_url TEXT
+    image_url TEXT,
+    size TEXT
 );
 
 CREATE TABLE prices (

@@ -15,8 +15,10 @@ from tempfile import mkdtemp
 from psycopg2 import connect, extras
 from psycopg2.extensions import connection
 from psycopg2.extras import RealDictCursor
+from selenium.webdriver.chrome.options import Options
 
 from extract import scrape_asos_page
+from scrape_test import scrape_data
 
 load_dotenv()
 
@@ -33,20 +35,20 @@ Session(app)
 
 
 EMAIL_SELECTION_QUERY = "SELECT email FROM users;"
-PRODUCT_URL_SELECTION_QUERY = "SELECT product_name FROM products;"
+PRODUCT_URL_SELECTION_QUERY = "SELECT product_name, size FROM products;"
 INSERT_USER_DATA_QUERY = "INSERT INTO users(email, first_name, last_name, password) VALUES (%s, %s, %s, %s)"
 INSERT_INTO_PRODUCTS_QUERY = """
-                INSERT INTO products (product_name, product_url, image_url, product_availability, website_name) 
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO products (product_name, product_url, image_url, product_availability, website_name, size) 
+                VALUES (%s, %s, %s, %s, %s, %s)
                 """
-PRODUCT_ID_QUERY = "SELECT product_id FROM products WHERE product_url = (%s)"
+PRODUCT_ID_QUERY = "SELECT product_id FROM products WHERE product_url = (%s) AND size = (%s)"
 INSERT_INTO_PRICES_QUERY = "INSERT INTO prices (updated_at, product_id, price) VALUES (%s, %s, %s)"
 SELECT_SUB_BY_PRODUCT_AND_USER_QUERY = "SELECT * FROM subscriptions WHERE user_id = (%s) AND product_id = (%s);"
 INSERT_INTO_SUBSCRIPTIONS_QUERY = "INSERT INTO subscriptions (user_id, product_id) VALUES (%s, %s);"
 SELECT_USERS_BY_EMAIL_QUERY = "SELECT user_id, password, email, first_name, last_name FROM users WHERE email = (%s);"
 SELECT_USERS_BY_ID_QUERY = "SELECT user_id, password, email, first_name, last_name FROM users WHERE user_id = (%s);"
 GET_PRODUCTS_FROM_EMAIL_QUERY = """
-                SELECT DISTINCT ON (prices.product_id) users.first_name, products.product_name,products.product_url, products.product_id, products.image_url, products.product_availability, prices.price
+                SELECT DISTINCT ON (prices.product_id) users.first_name, products.product_name,products.product_url, products.product_id, products.image_url, products.product_availability, products.size, prices.price
                 FROM users
                 JOIN subscriptions ON users.user_id = subscriptions.user_id
                 JOIN products ON subscriptions.product_id = products.product_id
@@ -60,7 +62,7 @@ GET_SUBS_BY_ID_QUERY = """
                 JOIN users ON subscriptions.user_id = users.user_id
                 WHERE users.user_id = (%s);
                 """
-GET_PROD_ID_BY_PROD_NAME_QUERY = "SELECT product_id FROM products WHERE product_name = %s;"
+GET_PROD_ID_BY_PROD_NAME_QUERY = "SELECT product_id FROM products WHERE product_name = (%s) AND size = (%s);"
 DELETE_SUBSCRIPTIONS_QUERY = "DELETE FROM subscriptions WHERE product_id = (%s) AND user_id = (%s);"
 
 
@@ -123,21 +125,27 @@ def insert_product_data_and_price_data(conn: connection, data_product: dict):
     rows = cur.fetchall()
     current_timestamp = datetime.now()
 
-    product_urls = [row["product_name"] for row in rows]
+    print(data_product)
+    in_database = False
+    for product in rows:
+        if data_product['name'] == product['product_name'] and data_product["sizes"] == product['size']:
+            in_database = True
+            break
 
-    if data_product['product_name'] in product_urls:
+    if in_database is True:
         conn.commit()
         cur.close()
 
     else:
+        cur.execute(INSERT_INTO_PRODUCTS_QUERY, (data_product.get('name', 'Unknown'),
+                                                 data_product['url'],
+                                                 data_product['image'],
+                                                 data_product['availability'],
+                                                 data_product['website_name'],
+                                                 data_product["sizes"]))
 
-        cur.execute(INSERT_INTO_PRODUCTS_QUERY, (data_product.get('product_name', 'Unknown'),
-                                                 data_product['product_url'],
-                                                 data_product['image_URL'],
-                                                 data_product['is_in_stock'],
-                                                 data_product['website_name']))
-
-        cur.execute(PRODUCT_ID_QUERY, (data_product["product_url"],))
+        cur.execute(PRODUCT_ID_QUERY,
+                    (data_product["url"], data_product["sizes"]))
 
         product_id = cur.fetchone()
 
@@ -149,7 +157,7 @@ def insert_product_data_and_price_data(conn: connection, data_product: dict):
         cur.close()
 
 
-def insert_subscription_data(conn: connection, user_id: str, product_url: str) -> None:
+def insert_subscription_data(conn: connection, user_id: str, product_data: dict) -> None:
     """
     Inserts subscription data into the subscription table.
     """
@@ -160,7 +168,7 @@ def insert_subscription_data(conn: connection, user_id: str, product_url: str) -
     cur.execute(user_query, (user_id,))
     user_id = cur.fetchone().get('user_id')
 
-    cur.execute(PRODUCT_ID_QUERY, (product_url,))
+    cur.execute(PRODUCT_ID_QUERY, (product_data['url'], product_data['sizes']))
     product_id = cur.fetchone().get('product_id')
 
     cur.execute(SELECT_SUB_BY_PRODUCT_AND_USER_QUERY, (user_id, product_id))
@@ -301,6 +309,40 @@ def logout():
     return redirect(url_for('index'))
 
 
+@app.route("/size", methods=["POST", "GET"])
+def choose_size():
+    """
+    Makes a user choose the size of the product they want to track.
+    """
+
+    connection = get_database_connection()
+    if request.method == "GET":
+        return render_template('/submission_form/choose_size.html')
+
+    if request.method == "POST":
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
+        product_data = session.get('product_data')
+        if product_data is None:
+            # Handle the case where product_data is not available
+            return "Product data is not available", 400
+
+        if 'url' not in session:
+            return redirect(url_for('login'))
+        size = request.form.get("size")
+
+        product_data["sizes"] = size
+
+        if "Out of stock" in size:
+            product_data['availability'] = False
+
+        insert_product_data_and_price_data(connection, product_data)
+        insert_subscription_data(
+            connection, session["user_id"], product_data)
+
+        return render_template('submitted_form/submitted_form.html')
+
+
 @app.route('/addproducts', methods=["POST", "GET"])
 def submit():
     """
@@ -318,12 +360,21 @@ def submit():
             'user-agent': environ["USER_AGENT"]
         }
 
-        product_data = scrape_asos_page(url, header)
+        chrome_options = Options()
+        chrome_options.add_argument("--headless=new")
+        chrome_options.add_argument(f'user-agent={environ["USER_AGENT"]}')
 
-        insert_product_data_and_price_data(connection, product_data)
-        insert_subscription_data(connection, session["user_id"], url)
+        product_data = scrape_data(url, chrome_options)
+        print(product_data)
+        session['product_data'] = product_data
+        session['url'] = url
 
-        return render_template('/submitted_form/submitted_form.html')
+        if product_data["sizes"] == "One Size":
+            insert_product_data_and_price_data(connection, product_data)
+            insert_subscription_data(connection, session["user_id"], url)
+            return render_template('/submitted_form/submitted_form.html')
+        else:
+            return render_template('/submission_form/choose_size.html', sizes=product_data["sizes"])
 
     if request.method == "GET":
         if 'user_id' not in session:
@@ -353,6 +404,7 @@ def subscriptions():
         email = result[0]["email"]
 
         user_products = get_products_from_email(conn, email)
+        print(user_products)
 
         for user in user_products:
             if user["product_availability"] == True:
@@ -383,9 +435,10 @@ def delete_subscription():
     conn = get_database_connection()
     product_name = request.form.get("product_name")
     email = request.form.get('user_email')
+    size = request.form.get('size')
 
     cur = conn.cursor(cursor_factory=extras.RealDictCursor)
-    cur.execute(GET_PROD_ID_BY_PROD_NAME_QUERY, (product_name,))
+    cur.execute(GET_PROD_ID_BY_PROD_NAME_QUERY, (product_name, size))
     product_id = cur.fetchone()['product_id']
 
     cur.execute(SELECT_USERS_BY_EMAIL_QUERY, (email,))
@@ -395,7 +448,7 @@ def delete_subscription():
                 (product_id, user_id))
     conn.commit()
 
-    return redirect(url_for('unsubscribe_index'))
+    return redirect(url_for('subscriptions'))
 
 
 @app.route("/submitted", methods=["POST"])

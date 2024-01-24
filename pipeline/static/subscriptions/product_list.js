@@ -3,7 +3,7 @@ function getUserEmail() {
             console.log(userEmail)
             return userEmail
         }
-        function deleteItem(element, productName) {
+        function deleteItem(element, productName, size) {
             var userEmail = getUserEmail()
             if (confirm("Are you sure you want to unsubscribe from receiving notifications for this product?")) {
                 var xhr_request = new XMLHttpRequest();
@@ -15,10 +15,10 @@ function getUserEmail() {
                         window.location.reload()
                     }
                 }
-                xhr_request.send("product_name=" + encodeURIComponent(productName) + "&user_email=" + encodeURIComponent(userEmail));
+                xhr_request.send("product_name=" + encodeURIComponent(productName) + "&user_email=" + encodeURIComponent(userEmail) + "&size=" + encodeURIComponent(size));
             }
         }
-        function deleteAllItems(element, productName) {
+        function deleteAllItems(element, productName, size) {
             var userEmail = getUserEmail()
             var xhr_request = new XMLHttpRequest();
             xhr_request.open("POST", "/delete_subscription", true);
@@ -29,15 +29,16 @@ function getUserEmail() {
                     window.location.reload()
                 }
             }
-            xhr_request.send("product_name=" + encodeURIComponent(productName) + "&user_email=" + encodeURIComponent(userEmail));
+            xhr_request.send("product_name=" + encodeURIComponent(productName) + "&user_email=" + encodeURIComponent(userEmail) + "&size=" + encodeURIComponent(size));
         }
 function deleteAllProducts() {
     if (confirm("Are you sure you want to unsubscribe from all products?")) {
         var table = document.querySelector('table tbody');
         Array.from(table.rows).forEach(row => {
-            // Assuming the product name is in the second cell of each row
-            var productName = row.cells[1].textContent;
-            deleteAllItems(row.cells[0].getElementsByTagName('button')[0], productName);
+            var productName = row.cells[1].textContent.trim();
+            var size = row.cells[3].textContent.trim();
+            var button = row.cells[0].getElementsByTagName('button')[0];
+            deleteAllItems(button, productName, size);
         });
     }
 }

@@ -26,6 +26,7 @@
                 <th class="center">Action</th>
                 <th class="center">Product Name</th>
                 <th class="center">Image</th>
+                <th class="center">Size</th>
                 <th class="center">Availability</th>
                 <th class="center">Current Price</th>
             </tr>
@@ -34,10 +35,11 @@
             {% for item in names %}
                 <tr>
                     <td>
-                        <button onclick="deleteItem(this, '{{ item.product_name }}')">Delete</button>
+                        <button onclick="deleteItem(this, '{{ item.product_name }}', '{{ item.size }}')">Delete</button>
                     </td>
                     <td><a href="{{ item.product_url }}">{{ item.product_name }}</a></td>
                     <td><img class="image" src="{{ item.image_url }}"/></td>
+                    <td class="size">{{ item.size }}</td>
                     <td class="available">{{ item.available }}</td>
                     <td class="price">£{{ '%0.2f'| format(item.price|float) }}</td>
                 </tr>

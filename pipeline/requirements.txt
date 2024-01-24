@@ -8,3 +8,4 @@ flask
 boto3
 pytest-cov
 flask_session
+selenium
